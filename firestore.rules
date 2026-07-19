@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isCapolinea() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/capolinea_autorizzati/$(request.auth.uid));
+    }
+
+    function isSuperUser() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/superuser_autorizzati/$(request.auth.uid));
+    }
+
+    match /ordini/{ordineId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.ordine.size() <= 300;
+      allow update: if request.auth != null
+                    && resource.data.bloccato == false
+                    && request.resource.data.bloccato == false
+                    && request.resource.data.ordine.size() <= 300;
+      allow update, delete: if isCapolinea();
+    }
+
+    match /giorni/{giornoId} {
+      allow read: if request.auth != null;
+      allow write: if isCapolinea();
+    }
+
+    match /utenti/{uid} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      // Il capolinea può correggere refusi di nome/cognome dal pannello, e solo quei due campi:
+      // niente altro nel documento utente è modificabile da un altro account.
+      allow update: if isCapolinea()
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nome', 'cognome'])
+                    && request.resource.data.nome is string
+                    && request.resource.data.nome.size() > 0 && request.resource.data.nome.size() <= 40
+                    && request.resource.data.cognome is string
+                    && request.resource.data.cognome.size() > 0 && request.resource.data.cognome.size() <= 40;
+      allow delete: if false;
+    }
+
+    // Chi è capolinea: lista privilegiata, modificabile solo dal superuser (mai da un altro capolinea,
+    // per evitare che un account capolinea possa auto-promuoversi o rimuovere gli altri).
+    match /capolinea_autorizzati/{uid} {
+      allow read: if request.auth != null;
+      allow write: if isSuperUser();
+    }
+
+    // Il ruolo più alto: nessuna scrittura dall'app, nemmeno dal superuser stesso.
+    // Il primo (e ogni) superuser va aggiunto a mano da Firebase Console, mai da qui.
+    match /superuser_autorizzati/{uid} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    match /eliminazioni_log/{docId} {
+      allow read, create: if isCapolinea();
+      allow update, delete: if false;
+    }
+  }
+}
