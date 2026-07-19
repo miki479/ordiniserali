@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Vico Meal</title>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@latest/dist/jspdf.umd.min.js"></script>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%F0%9F%8D%9D</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#6B2737">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+<div class="app">
+
+  <!-- SPLASH: evita il flash del login mentre Firebase controlla se sei già collegato -->
+  <section id="loading-screen" class="login-screen">
+    <div class="fork-big">🍝</div>
+  </section>
+
+  <!-- LOGIN / REGISTRAZIONE -->
+  <section id="login-screen" class="login-screen" hidden>
+    <div class="fork-big">🍝</div>
+    <h1>Vico Meal</h1>
+    <p class="sub" id="auth-mode-sub">Crea il tuo account per ordinare</p>
+    <form id="auth-form">
+      <input type="text" id="nome" placeholder="Nome" autocomplete="given-name" maxlength="40">
+      <input type="text" id="cognome" placeholder="Cognome" autocomplete="family-name" maxlength="40" class="step-hidden">
+      <input type="password" id="password" placeholder="Password (min. 6 caratteri)" minlength="6" maxlength="64" class="step-hidden">
+      <input type="password" id="conferma-password" placeholder="Conferma password" minlength="6" maxlength="64" class="step-hidden">
+      <button type="submit" id="auth-submit-btn" class="step-hidden">Crea account e entra →</button>
+    </form>
+    <button type="button" id="toggle-auth-mode" class="text-link" style="margin-top:14px;">Hai già un account? Accedi</button>
+    <p style="font-size:9px;color:var(--ink-soft);opacity:0.45;margin-top:20px;">build 2026-07-20-A</p>
+  </section>
+
+  <section id="welcome-back-screen" class="login-screen" hidden>
+    <div class="fork-big">👋</div>
+    <h1 id="welcome-back-name">Bentornato</h1>
+    <p class="sub">Questo dispositivo risulta già collegato a un account. Sei tu?</p>
+    <button type="button" id="welcome-back-yes"
+      style="width:100%;background:var(--wine);color:var(--paper);border:none;padding:15px;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;font-family:'Inter',sans-serif;margin-bottom:10px;">
+      Sì, sono io →
+    </button>
+    <button type="button" id="welcome-back-no"
+      style="width:100%;background:none;color:var(--ink-soft);border:1.5px solid var(--line);padding:14px;border-radius:12px;font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;">
+      Non sono io, esci dall'account
+    </button>
+  </section>
+
+  <!-- MAIN APP -->
+  <div id="menu" hidden>
+    <header>
+      <div class="brand">
+        <span class="fork">🍝</span>
+        <div>
+          <h1>Vico Meal</h1>
+          <span class="tag">Comanda serale</span>
+        </div>
+      </div>
+      <div class="who">
+        <div>
+          <div class="name" id="username">—</div>
+          <div class="role" id="status"></div>
+        </div>
+        <div class="who-actions">
+          <button id="panel-trigger" title="Pannello capolinea" aria-label="Pannello capolinea" hidden>⚙</button>
+          <button id="logout-btn" title="Esci" aria-label="Esci dall'account">⏻</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <p class="section-label">Cosa vuoi mangiare stasera?</p>
+      <div id="repeat-order-slot"></div>
+
+      <div class="order-form-wrap">
+        <div class="order-form" id="order-form">
+          <div class="chip-row" id="chip-suggestions">
+            <button type="button" class="chip" data-fill="Panino con salsiccia">Panino</button>
+            <button type="button" class="chip" data-fill="Grigliata mista">Grigliata</button>
+            <button type="button" class="chip" data-fill="Pasta al ragù">Pasta</button>
+            <button type="button" class="chip" data-fill="Hamburger con patatine">Hamburger</button>
+          </div>
+
+          <div class="order-input-wrap">
+            <textarea id="ordine-personalizzato" maxlength="300" placeholder="Scrivi qui il tuo ordine, con eventuali richieste (es. no cipolla)..." required></textarea>
+          </div>
+
+          <p class="section-label">Accompagnamento</p>
+          <div class="accomp-row" id="accomp-row">
+            <div class="accomp-chip" data-value="">Nessuno</div>
+            <div class="accomp-chip" data-value="Pane">🍞 Pane</div>
+            <div class="accomp-chip" data-value="Spianata">🫓 Spianata</div>
+          </div>
+        </div>
+        <div class="locked-overlay" id="locked-overlay" hidden>
+          <span class="locked-badge">🔒 Ordine bloccato</span>
+        </div>
+      </div>
+
+      <div class="ticket">
+        <div class="ticket-head">
+          <span class="num" id="ticket-num">COMANDA</span>
+          <span class="status" id="ticket-status">DA INVIARE</span>
+        </div>
+        <div class="ticket-body" id="ticket-body">
+          <span class="empty">Il riepilogo del tuo ordine apparirà qui...</span>
+        </div>
+        <button id="effettua-ordine" class="send-btn" disabled>Invia comanda</button>
+        <div class="stamp" id="stamp">✓ ORDINE INVIATO</div>
+      </div>
+
+      <button class="text-link" id="foryou-trigger">+ Ordina per un collega</button>
+
+      <div class="capolinea-zone" id="capolinea-zone" hidden>
+        <p class="section-label">Solo capolinea</p>
+        <button id="scarica-pdf" class="pdf-btn">⇩ Scarica PDF ordini</button>
+        <button id="elimina-ordini" class="danger-link">Elimina tutti gli ordini della serata</button>
+      </div>
+    </main>
+  </div>
+
+  <button class="info-icon" id="info-trigger" aria-label="Informazioni sui dati">i</button>
+
+  <!-- DISCLAIMER OVERLAY -->
+  <div id="disclaimer-overlay" class="overlay">
+    <div class="overlay-content">
+      <h2>Come funzionano i tuoi dati</h2>
+      <p><strong>Account:</strong> nome, cognome e password, salvati su Firebase. La password non è visibile a nessuno, nemmeno a chi amministra l'app.</p>
+      <p><strong>Ordini:</strong> vedi solo il tuo. Il capolinea vede l'elenco completo per generare il PDF e può correggere ordini o nome/cognome dal suo pannello. Solo il superuser sceglie chi è capolinea.</p>
+      <p><strong>Durata:</strong> gli ordini più vecchi di 3 mesi vengono cancellati in automatico. Ogni cancellazione manuale è definitiva e registrata (chi, quando), visibile solo ai capilinea.</p>
+      <p><strong>Accesso riservato:</strong> capilinea e superuser sono account scelti a mano dall'amministratore. Nessuna password condivisa.</p>
+      <p><strong>Responsabilità:</strong> i dati restano su Firebase (Google), nessuna condivisione con terzi. Sei tu responsabile di come usi l'app sul tuo dispositivo.</p>
+      <button class="overlay-btn neutral" data-close="disclaimer-overlay">Chiudi</button>
+    </div>
+  </div>
+
+  <!-- CONFIRM OVERLAY (generic) -->
+  <div id="confirm-overlay" class="overlay">
+    <div class="overlay-content">
+      <h2 id="confirm-title">Confermi?</h2>
+      <p id="confirm-text"></p>
+      <button class="overlay-btn primary" id="confirm-yes">Conferma</button>
+      <button class="overlay-btn ghost" id="confirm-no">Annulla</button>
+    </div>
+  </div>
+
+  <!-- ORDINA PER UN COLLEGA OVERLAY -->
+  <div id="foryou-overlay" class="overlay">
+    <div class="overlay-content">
+      <h2>Ordina per un collega</h2>
+      <input type="text" id="foryou-nome" placeholder="Nome del collega" maxlength="40">
+      <input type="text" id="foryou-cognome" placeholder="Cognome del collega" maxlength="40">
+      <input type="text" id="foryou-ordine" maxlength="300" placeholder="Cosa ordina">
+      <p class="section-label" style="margin-top:4px;">Accompagnamento</p>
+      <div class="accomp-row" id="foryou-accomp-row" style="margin-bottom:8px;">
+        <div class="accomp-chip" data-value="">Nessuno</div>
+        <div class="accomp-chip" data-value="Pane">🍞 Pane</div>
+        <div class="accomp-chip" data-value="Spianata">🫓 Spianata</div>
+      </div>
+      <div id="foryou-scelta-persona" hidden>
+        <p class="section-label">Chi intendi?</p>
+        <div id="foryou-scelta-lista"></div>
+      </div>
+      <button class="overlay-btn primary" id="foryou-submit">Invia comanda</button>
+      <button class="overlay-btn ghost" data-close="foryou-overlay">Annulla</button>
+    </div>
+  </div>
+
+  <!-- PANNELLO CAPOLINEA -->
+  <div id="pannello-overlay" class="overlay">
+    <div class="overlay-content">
+      <h2>Pannello capolinea</h2>
+      <div class="pannello-tabs">
+        <button type="button" class="pannello-tab active" data-pannello-tab="ordini">Ordini di oggi</button>
+        <button type="button" class="pannello-tab" data-pannello-tab="utenti">Utenti</button>
+      </div>
+      <div id="pannello-ordini-tab" class="pannello-tab-content">
+        <div id="pannello-ordini-lista"><span class="empty">Caricamento...</span></div>
+      </div>
+      <div id="pannello-utenti-tab" class="pannello-tab-content" hidden>
+        <p class="pannello-note">Nome e cognome qui non cambiano le credenziali di accesso: su un dispositivo nuovo si accede sempre con quelli originali. Lo stato Capolinea lo cambia solo il superuser.</p>
+        <div id="pannello-utenti-lista"><span class="empty">Caricamento...</span></div>
+      </div>
+      <button class="overlay-btn ghost" data-close="pannello-overlay">Chiudi</button>
+    </div>
+  </div>
+
+  <!-- OMONIMO IN REGISTRAZIONE -->
+  <div id="omonimo-overlay" class="overlay">
+    <div class="overlay-content">
+      <h2>Questo nome esiste già</h2>
+      <p id="omonimo-testo"></p>
+      <p>Se sei un'altra persona con lo stesso nome, aggiungi un'iniziale (es. <strong>Mario B.</strong>): ti distinguerà nella comanda, e la userai per accedere.</p>
+      <button class="overlay-btn primary" id="omonimo-accedi">Sono io → vai all'accesso</button>
+      <button class="overlay-btn neutral" id="omonimo-iniziale">Sono un'altra persona → aggiungo l'iniziale</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="offline-banner" hidden>Sei offline: gli ordini non possono partire finché non torna la connessione</div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "Vico Meal",
+  "short_name": "Vico Meal",
+  "description": "Comanda serale del turno - Tcevico, by Forte Michele",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FBF1E4",
+  "theme_color": "#6B2737",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
